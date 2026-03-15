@@ -220,10 +220,8 @@ pub trait DataFrameJoinOps: IntoDf {
         {
             polars_bail!(
                 ComputeError:
-                    format!(
-                        "datatypes of join keys don't match - `{}`: {} on left does not match `{}`: {} on right",
-                        l.name(), l.dtype().pretty_format(), r.name(), r.dtype().pretty_format()
-                    )
+                    "datatypes of join keys don't match - `{}`: {} on left does not match `{}`: {} on right",
+                    l.name(), l.dtype().pretty_format(), r.name(), r.dtype().pretty_format()
             );
         };
 
@@ -328,7 +326,7 @@ pub trait DataFrameJoinOps: IntoDf {
                     },
                 },
                 #[cfg(feature = "iejoin")]
-                JoinType::IEJoin => {
+                JoinType::IEJoin | JoinType::Range => {
                     unreachable!()
                 },
                 JoinType::Cross => {
@@ -374,7 +372,7 @@ pub trait DataFrameJoinOps: IntoDf {
                 ComputeError: "asof join not supported for join on multiple keys"
             ),
             #[cfg(feature = "iejoin")]
-            JoinType::IEJoin => {
+            JoinType::IEJoin | JoinType::Range => {
                 unreachable!()
             },
             JoinType::Cross => {

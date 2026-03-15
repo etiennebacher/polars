@@ -552,7 +552,7 @@ fn to_graph_rec<'a>(
             let sort_node = lp_arena.add(IR::Sort {
                 input: df_node,
                 by_column: by_column.clone(),
-                slice: *slice,
+                slice: slice.map(|t| (t.0, t.1, None)),
                 sort_options: sort_options.clone(),
             });
             let executor = Mutex::new(create_physical_plan(
@@ -582,6 +582,7 @@ fn to_graph_rec<'a>(
             by_column,
             reverse,
             nulls_last,
+            dyn_pred,
         } => {
             let input_key = to_graph_rec(input.node, ctx)?;
             let k_key = to_graph_rec(k.node, ctx)?;
@@ -602,6 +603,7 @@ fn to_graph_rec<'a>(
                     nulls_last.clone(),
                     key_schema,
                     key_selectors,
+                    dyn_pred.clone(),
                 ),
                 [(input_key, input.port), (k_key, k.port)],
             )
@@ -1108,6 +1110,8 @@ fn to_graph_rec<'a>(
             input_right,
             left_on,
             right_on,
+            tmp_left_key_col,
+            tmp_right_key_col,
             descending,
             nulls_last,
             keys_row_encoded,
@@ -1127,6 +1131,8 @@ fn to_graph_rec<'a>(
                     output_schema,
                     left_on.clone(),
                     right_on.clone(),
+                    tmp_left_key_col.clone(),
+                    tmp_right_key_col.clone(),
                     *descending,
                     *nulls_last,
                     *keys_row_encoded,
@@ -1168,6 +1174,8 @@ fn to_graph_rec<'a>(
             input_right,
             left_on,
             right_on,
+            tmp_left_key_col,
+            tmp_right_key_col,
             args,
         } => {
             let args = args.clone();
@@ -1183,6 +1191,8 @@ fn to_graph_rec<'a>(
                         right_input_schema,
                         left_on.clone(),
                         right_on.clone(),
+                        tmp_left_key_col.clone(),
+                        tmp_right_key_col.clone(),
                         args,
                     ),
                     [
@@ -1195,6 +1205,43 @@ fn to_graph_rec<'a>(
             {
                 unreachable!("asof_join feature is disabled")
             }
+        },
+
+        #[cfg(feature = "iejoin")]
+        RangeJoin {
+            input_left,
+            input_right,
+            left_on,
+            right_on,
+            tmp_left_key_cols,
+            tmp_right_key_cols,
+            descending,
+            args,
+            options,
+        } => {
+            let args = args.clone();
+            let options = options.clone();
+            let left_input_key = to_graph_rec(input_left.node, ctx)?;
+            let right_input_key = to_graph_rec(input_right.node, ctx)?;
+            let left_input_schema = ctx.phys_sm[input_left.node].output_schema.clone();
+            let right_input_schema = ctx.phys_sm[input_right.node].output_schema.clone();
+            ctx.graph.add_node(
+                nodes::joins::range_join::RangeJoinNode::new(
+                    left_input_schema,
+                    right_input_schema,
+                    left_on.clone(),
+                    right_on.clone(),
+                    tmp_left_key_cols.clone(),
+                    tmp_right_key_cols.clone(),
+                    *descending,
+                    args,
+                    options,
+                ),
+                [
+                    (left_input_key, input_left.port),
+                    (right_input_key, input_right.port),
+                ],
+            )
         },
 
         #[cfg(feature = "merge_sorted")]
